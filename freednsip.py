@@ -11,6 +11,7 @@ import smtplib
 import urllib2
 import os.path
 import time
+import logging
 from email.mime.text import MIMEText
 
 ipFile = '/usr/local/freednsip/ip.txt'
@@ -50,10 +51,11 @@ def emailadmin(mesg):
     server.sendmail(fromAddr, recipients, msg.as_string())
     server.quit()
     print 'Notification email sent out to admins with the following message:\n',mesg
+    logging.warning('Notification email sent out to admins with the following message:\n'+mesg)
     
 def updatedns(ip):
     # Change FreeDNS registration
-    print 'Updating DNS...'
+    logging.debug('Updating DNS...')
     while True:
         conn = httplib.HTTPConnection(freeDNSHost)
         conn.request('GET', dnsURL)
@@ -79,25 +81,33 @@ def updatedns(ip):
             break
         else:
             print 'Got resonse from server: ', result, '\n Retry after 20 sec...'
+            logging.error('Got resonse from server: '+ result+ '\n Retry after 20 sec...')
             time.sleep(20)
+    logging.info ('Finished DNS update.')
 
+FORMAT = '%(asctime)s | %(levelname)s  \t| %(message)s'
+logging.basicConfig(filename='freednsip.log', level=logging.DEBUG, format=FORMAT)
 try:
     # Get IP Address
     currentIP = urllib2.urlopen("http://ip.dnsexit.com/").read().strip()
-    print '\n\nCurrent IP address is:\t\t', currentIP
+    logging.debug('Begin:')
+    logging.debug('Current IP address is:\t'+currentIP)
     # Read previously recorded IP from ipFile
     if not os.path.exists(ipFile):
-        print 'Previous IP as recorded:\tFile not found'
+        logging.warning('Previous IP as recorded:\tFile not found')
         updatedns(currentIP)
     else:
         f = open(ipFile,'r')    
         previousIP = f.read()
         f.close()
-        print 'Previous IP as recorded:\t', previousIP
+        logging.debug('Previous IP as recorded:\t' + previousIP)
         if previousIP == currentIP:
-            print 'IP not changed.\n\n'
+            print ('IP not changed.')
+            logging.info('IP not changed.')
+            logging.debug('End')
         else:
-            print 'IP change detected.'
+            logging.warning('IP change detected.')
             updatedns(currentIP)
 except Exception as e:
     print 'Error:\n',e
+    logging.error(e)
