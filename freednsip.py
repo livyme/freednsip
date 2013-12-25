@@ -15,6 +15,7 @@ import logging
 from email.mime.text import MIMEText
 
 ipFile = '/usr/local/freednsip/ip.txt'
+logFile = '/usr/local/freednsip/freednsip.log'
 freeDNSHost = 'freedns.afraid.org'
 mbpFreeDNSString = 'VURmdmdhMzFVMVVBQU9IVVN5MEFBQUFIOjg0NDc2ODg='
 centralFreeDNSString = 'VURmdmdhMzFVMVVBQU9IVVN5MEFBQUFIOjgyMDY3NTc='
@@ -80,17 +81,18 @@ def updatedns(ip):
                 emailadmin(content)
             break
         else:
-            print 'Got resonse from server: ', result, '\n Retry after 20 sec...'
-            logging.error('Got resonse from server: '+ result+ '\n Retry after 20 sec...')
+            print 'Got resonse from server: ', result, '\nRetry after 20 sec...'
+            logging.error('Got resonse from server: '+ result+ '\nRetry after 20 sec...')
             time.sleep(20)
     logging.info ('Finished DNS update.')
 
 FORMAT = '%(asctime)s | %(levelname)s  \t| %(message)s'
-logging.basicConfig(filename='freednsip.log', level=logging.DEBUG, format=FORMAT)
+logging.basicConfig(filename=logFile, level=logging.INFO, format=FORMAT)
+logging.debug('Begin:')
+
 try:
     # Get IP Address
     currentIP = urllib2.urlopen("http://ip.dnsexit.com/").read().strip()
-    logging.debug('Begin:')
     logging.debug('Current IP address is:\t'+currentIP)
     # Read previously recorded IP from ipFile
     if not os.path.exists(ipFile):
@@ -103,7 +105,7 @@ try:
         logging.debug('Previous IP as recorded:\t' + previousIP)
         if previousIP == currentIP:
             print ('IP not changed.')
-            logging.info('IP not changed.')
+            logging.info('IP address ' + currentIP + ' not changed. ')
             logging.debug('End')
         else:
             logging.warning('IP change detected.')
