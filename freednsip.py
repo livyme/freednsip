@@ -10,17 +10,23 @@ import httplib
 import smtplib
 import urllib2
 import os.path
-import time
 import logging
+import time
+import ConfigParser
 from email.mime.text import MIMEText
 
-ipFile = '/usr/local/freednsip/ip.txt'
-logFile = '/usr/local/freednsip/freednsip.log'
-freeDNSHost = 'freedns.afraid.org'
-mbpFreeDNSString = 'VURmdmdhMzFVMVVBQU9IVVN5MEFBQUFIOjg0NDc2ODg='
-centralFreeDNSString = 'VURmdmdhMzFVMVVBQU9IVVN5MEFBQUFIOjgyMDY3NTc='
-dnsURL = '/dynamic/update.php?'+ mbpFreeDNSString
-selfName = 'Macbook Pro Retina'
+config = ConfigParser.RawConfigParser()
+config.read('settings.cfg')
+
+freeDNSHost = config.get('settings','freeDNSHost')
+freeDNSURL = config.get('settings','freeDNSURL')
+ipFile = config.get('settings','ipFile')
+logFile = config.get('settings','logFile')
+selfName = config.get('settings','selfName')
+
+FORMAT = '%(asctime)s | %(levelname)s  \t| %(message)s'
+logging.basicConfig(filename=logFile, level=logging.DEBUG, format=FORMAT)
+logging.debug('Begin:')
 
 def emailadmin(mesg):
     # Prepare message
@@ -52,14 +58,15 @@ def emailadmin(mesg):
     server.sendmail(fromAddr, recipients, msg.as_string())
     server.quit()
     print 'Notification email sent out to admins with the following message:\n',mesg
-    logging.warning('Notification email sent out to admins with the following message:\n'+mesg)
-    
+    logging.warning('Notification email sent out to admins with the following message: '+mesg)
+
 def updatedns(ip):
+
     # Change FreeDNS registration
     logging.debug('Updating DNS...')
     while True:
         conn = httplib.HTTPConnection(freeDNSHost)
-        conn.request('GET', dnsURL)
+        conn.request('GET', freeDNSURL)
         r1 = conn.getresponse()
         result = r1.read()
         conn.close()
@@ -81,18 +88,16 @@ def updatedns(ip):
                 emailadmin(content)
             break
         else:
-            print 'Got resonse from server: ', result, '\nRetry after 20 sec...'
-            logging.error('Got resonse from server: '+ result+ '\nRetry after 20 sec...')
+            print 'HTTP response from FreeDNS server: ', r1.status, ':\n', result, '\nRetry after 20 sec...'
+            logging.error('HTTP response code: '+r1.status)
+            logging.error('HTTP response content:\n'+ result)
+            logging.error('Retry after 20 sec...')
             time.sleep(20)
-    logging.info ('Finished DNS update.')
-
-FORMAT = '%(asctime)s | %(levelname)s  \t| %(message)s'
-logging.basicConfig(filename=logFile, level=logging.INFO, format=FORMAT)
-logging.debug('Begin:')
+    logging.debug ('Finished DNS update.')
 
 try:
     # Get IP Address
-    currentIP = urllib2.urlopen("http://ip.dnsexit.com/").read().strip()
+    currentIP = urllib2.urlopen('http://ip.dnsexit.com/').read().strip()
     logging.debug('Current IP address is:\t'+currentIP)
     # Read previously recorded IP from ipFile
     if not os.path.exists(ipFile):
@@ -108,8 +113,9 @@ try:
             logging.info('IP address ' + currentIP + ' not changed. ')
             logging.debug('End')
         else:
-            logging.warning('IP change detected.')
+            logging.debug('IP change detected.')
             updatedns(currentIP)
 except Exception as e:
     print 'Error:\n',e
+    logging.error('Tip: Check internet connection, cannot get public IP. ')
     logging.error(e)
