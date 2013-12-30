@@ -20,16 +20,11 @@ from email.mime.text import MIMEText
 # Reading from setting.cfg file
 config = ConfigParser.RawConfigParser()
 config.read(sys.path[0]+sep+'settings.cfg')
+ipFile = sys.path[0]+sep+'ip.txt'
+logFile = sys.path[0]+sep+'freednsip.log'
 
-freeDNSHost = config.get('settings','freeDNSHost')
-freeDNSURL = config.get('settings','freeDNSURL')
-ipFile = config.get('settings','ipFile')
-logFile = config.get('settings','logFile')
-selfName = config.get('settings','selfName')
 logLevel = config.get('logging', 'logLevel')
 consoleLogLevel = config.get('logging', 'consoleLogLevel')
-username = config.get('gmail','username')
-password = config.get('gmail','password')
 
 # Setting up logging
 FORMAT = '%(asctime)s | %(levelname)-7s | %(message)s'
@@ -45,13 +40,15 @@ def emailadmin(mesg):
     msg = MIMEText(mesg)
     msg['From'] = 'root'
     msg['To'] = ', '.join(recipients)
-    msg['Subject'] = selfName + ' IP Change'
+    msg['Subject'] = config.get('settings','selfName') + ' IP Change'
     # Optional header fields just for fun
     msg['X-Priority'] = '1'
     msg['X-Message-Flag'] = 'Livyme'
     msg['X-Generated-By'] = 'Python'
     msg['Importance'] = 'High'
-    
+    # Get gmail account info.
+    username = config.get('gmail','username')
+    password = config.get('gmail','password')
     # Mail send using alert
     fromAddr = 'alert@livyme.com'
     server = smtplib.SMTP('smtp.gmail.com:587')
@@ -59,12 +56,11 @@ def emailadmin(mesg):
     server.login(username,password)
     server.sendmail(fromAddr, recipients, msg.as_string())
     server.quit()
-    logging.warning('Notification email sent out to admins with the following message: '+mesg)
+    logging.debug('Notification email sent out to admins.')
 
 def updatedns(ip):
-
-    # Change FreeDNS registration
-    logging.debug('Updating DNS...')
+    freeDNSHost = config.get('settings','freeDNSHost')
+    freeDNSURL = config.get('settings','freeDNSURL')
     while True:
         conn = httplib.HTTPConnection(freeDNSHost)
         conn.request('GET', freeDNSURL)
@@ -76,44 +72,40 @@ def updatedns(ip):
                 f = open(ipFile,'w')
                 f.write(ip)
                 f.close()
-                emailadmin(result)
             elif 'has not changed' in result:
                 # Although no change, but go ahead and change the IP file anyway
                 f = open(ipFile,'w')
                 f.write(ip)
                 f.close()
-                content = 'FreeDNS server returns the following code:\n\n'+result+'\nCurrent IP is '+ip
-                emailadmin(content)
             else:
-                content = 'Unknown error...\nFreeDNS server returns the following code:\n\n'+result+'\nCurrent IP is '+ip
-                emailadmin(content)
+                logging.warning ('Unknow error')
+            logging.debug('From FreeDNS:')
+            logging.info(result.strip())
             break
         else:
             logging.error('HTTP response code: {0}'.format(r1.status))
             logging.error('HTTP response content:\n' + result)
             logging.error('Retry after 20 sec...')
             time.sleep(20)
-    logging.debug ('Finished DNS update.')
-
-logging.debug('Begin:')
+    return result.strip()
+    
 try:
     # Get IP Address
     currentIP = urllib2.urlopen('http://ip.dnsexit.com/').read().strip()
-    logging.debug('Current IP address is:\t'+currentIP)
+    logging.debug('%-22s\t%s', 'Current IP address is:', currentIP)
     # Read previously recorded IP from ipFile
     if not os.path.exists(ipFile):
-        logging.warning('Previous IP as recorded:\tFile not found')
-        updatedns(currentIP)
+        previousIP = 'IP file not found'
     else:
         f = open(ipFile,'r')    
-        previousIP = f.read()
+        previousIP = f.read().strip()
         f.close()
-        logging.debug('Previous IP as recorded:\t' + previousIP)
-        if previousIP == currentIP:
-            logging.info('IP address ' + currentIP + ' not changed. ')
-            logging.debug('End')
-        else:
-            logging.debug('IP change detected.')
-            updatedns(currentIP)
+    logging.debug('%-22s\t%s','Previous IP as recorded:', previousIP)
+    # If ip not changed, then do nothing.
+    if previousIP == currentIP:
+        logging.info('IP address %s not changed.', currentIP)
+    else:
+        logging.info('%-22s ==>\t%s', 'IP changed: ' +  previousIP, currentIP)
+        emailadmin(updatedns(currentIP))
 except Exception as e:
     logging.error('{0} ==> Is the Internet down?'.format(e.reason))
