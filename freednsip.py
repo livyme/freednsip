@@ -16,7 +16,7 @@ import ConfigParser
 from email.mime.text import MIMEText
 
 config = ConfigParser.RawConfigParser()
-config.read('settings.cfg')
+config.read('/usr/local/freednsip/settings.cfg')
 
 freeDNSHost = config.get('settings','freeDNSHost')
 freeDNSURL = config.get('settings','freeDNSURL')
@@ -24,8 +24,16 @@ ipFile = config.get('settings','ipFile')
 logFile = config.get('settings','logFile')
 selfName = config.get('settings','selfName')
 
-FORMAT = '%(asctime)s | %(levelname)s  \t| %(message)s'
-logging.basicConfig(filename=logFile, level=logging.DEBUG, format=FORMAT)
+logLevel = config.get('logging', 'logLevel')
+consoleLogLevel = config.get('logging', 'consoleLogLevel')
+
+FORMAT = '%(asctime)s | %(levelname)-7s | %(message)s'
+logging.basicConfig(filename=logFile, level=logLevel, format=FORMAT)
+console = logging.StreamHandler()
+console.setLevel(consoleLogLevel)
+console.setFormatter(logging.Formatter('%(message)s'))
+logging.getLogger('').addHandler(console)
+
 logging.debug('Begin:')
 
 def emailadmin(mesg):
@@ -41,10 +49,6 @@ def emailadmin(mesg):
     msg['X-Generated-By'] = 'Python'
     msg['Importance'] = 'High'
     
-    ## Send out using sendmail
-    ## p =subprocess.Popen(["/usr/sbin/sendmail", "-t"], stdin=subprocess.PIPE)
-    ## p.communicate(msg.as_string())
-    
     # Send out using gmail
     # Credentials
     username = 'alert@livyme.com'
@@ -57,7 +61,6 @@ def emailadmin(mesg):
     server.login(username,password)
     server.sendmail(fromAddr, recipients, msg.as_string())
     server.quit()
-    print 'Notification email sent out to admins with the following message:\n',mesg
     logging.warning('Notification email sent out to admins with the following message: '+mesg)
 
 def updatedns(ip):
@@ -88,7 +91,6 @@ def updatedns(ip):
                 emailadmin(content)
             break
         else:
-            print 'HTTP response from FreeDNS server: ', r1.status, ':\n', result, '\nRetry after 20 sec...'
             logging.error('HTTP response code: '+r1.status)
             logging.error('HTTP response content:\n'+ result)
             logging.error('Retry after 20 sec...')
@@ -109,13 +111,10 @@ try:
         f.close()
         logging.debug('Previous IP as recorded:\t' + previousIP)
         if previousIP == currentIP:
-            print ('IP not changed.')
             logging.info('IP address ' + currentIP + ' not changed. ')
             logging.debug('End')
         else:
             logging.debug('IP change detected.')
             updatedns(currentIP)
 except Exception as e:
-    print 'Error:\n',e
-    logging.error('Tip: Check internet connection, cannot get public IP. ')
-    logging.error(e)
+    logging.error('{0} ==> Is the Internet down?'.format(e.reason))
