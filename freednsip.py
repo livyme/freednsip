@@ -17,6 +17,7 @@ import time
 import ConfigParser
 from email.mime.text import MIMEText
 
+# Reading from setting.cfg file
 config = ConfigParser.RawConfigParser()
 config.read(sys.path[0]+sep+'settings.cfg')
 
@@ -25,18 +26,18 @@ freeDNSURL = config.get('settings','freeDNSURL')
 ipFile = config.get('settings','ipFile')
 logFile = config.get('settings','logFile')
 selfName = config.get('settings','selfName')
-
 logLevel = config.get('logging', 'logLevel')
 consoleLogLevel = config.get('logging', 'consoleLogLevel')
+username = config.get('gmail','username')
+password = config.get('gmail','password')
 
+# Setting up logging
 FORMAT = '%(asctime)s | %(levelname)-7s | %(message)s'
 logging.basicConfig(filename=logFile, level=logLevel, format=FORMAT)
 console = logging.StreamHandler(sys.stdout)
 console.setLevel(consoleLogLevel)
 console.setFormatter(logging.Formatter('%(message)s'))
 logging.getLogger('').addHandler(console)
-
-logging.debug('Begin:')
 
 def emailadmin(mesg):
     # Prepare message
@@ -50,11 +51,6 @@ def emailadmin(mesg):
     msg['X-Message-Flag'] = 'Livyme'
     msg['X-Generated-By'] = 'Python'
     msg['Importance'] = 'High'
-    
-    # Send out using gmail
-    # Credentials
-    username = 'alert@livyme.com'
-    password = 'jae1EGhu'
     
     # Mail send using alert
     fromAddr = 'alert@livyme.com'
@@ -93,12 +89,13 @@ def updatedns(ip):
                 emailadmin(content)
             break
         else:
-            logging.error('HTTP response code: '+r1.status)
-            logging.error('HTTP response content:\n'+ result)
+            logging.error('HTTP response code: {0}'.format(r1.status))
+            logging.error('HTTP response content:\n' + result)
             logging.error('Retry after 20 sec...')
             time.sleep(20)
     logging.debug ('Finished DNS update.')
 
+logging.debug('Begin:')
 try:
     # Get IP Address
     currentIP = urllib2.urlopen('http://ip.dnsexit.com/').read().strip()
