@@ -10,13 +10,15 @@ import httplib
 import smtplib
 import urllib2
 import os.path
+import sys
+from os import sep
 import logging
 import time
 import ConfigParser
 from email.mime.text import MIMEText
 
 config = ConfigParser.RawConfigParser()
-config.read('/usr/local/freednsip/settings.cfg')
+config.read(sys.path[0]+sep+'settings.cfg')
 
 freeDNSHost = config.get('settings','freeDNSHost')
 freeDNSURL = config.get('settings','freeDNSURL')
@@ -29,7 +31,7 @@ consoleLogLevel = config.get('logging', 'consoleLogLevel')
 
 FORMAT = '%(asctime)s | %(levelname)-7s | %(message)s'
 logging.basicConfig(filename=logFile, level=logLevel, format=FORMAT)
-console = logging.StreamHandler()
+console = logging.StreamHandler(sys.stdout)
 console.setLevel(consoleLogLevel)
 console.setFormatter(logging.Formatter('%(message)s'))
 logging.getLogger('').addHandler(console)
