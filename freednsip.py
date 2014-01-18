@@ -15,23 +15,6 @@ from os import sep
 import logging
 import ConfigParser
 
-ipFile = sys.path[0]+sep+'ip.txt'
-logFile = sys.path[0]+sep+'freednsip.log'
-
-# Reading from setting.cfg file
-config = ConfigParser.RawConfigParser()
-config.read(sys.path[0]+sep+'settings.cfg')
-
-# Set up logging
-logLevel = config.get('logging', 'logLevel')
-consoleLogLevel = config.get('logging', 'consoleLogLevel')
-FORMAT = '%(asctime)s | %(levelname)-7s | %(message)s'
-logging.basicConfig(filename = logFile, level = logLevel, format = FORMAT)
-console = logging.StreamHandler(sys.stdout)
-console.setLevel(consoleLogLevel)
-console.setFormatter(logging.Formatter('%(message)s'))
-logging.getLogger('').addHandler(console)
-
 def emailadmin(mesg):
     # Prepare message
     recipients = ['7854326040@txt.att.net', 'i@livyme.com']
@@ -50,29 +33,53 @@ def emailadmin(mesg):
     server.quit()
 
 def updatedns(ip):
-    code = False
+    success = False
     try:
         conn = urllib2.urlopen(config.get('freeDNS','url'))
+    except urllib2.HTTPError as e:
+        result = 'HTTP {} {}'.format(e.code, e.reason)
+    except urllib2.URLError as e:
+        result = 'URLError: {} ==> Is the Internet down?'.format(e.reason,)
+    except Exception as e:
+        result = 'Error: {}'.format(str(e))
+    else:
         result = conn.read().strip()
         if 'Updated' in result or 'has not changed' in result:
             f = open(ipFile,'w')
             f.write(ip)
             f.close()
-            code = True
+            success = True
         else:
-            result = 'While changing DNS: Unknow error: {}'.format(result)
-    except urllib2.HTTPError as e:
-        result = 'While changing DNS: HTTP {}: {}'.format(e.code, e.reason)
-    except urllib2.URLError as e:
-        result = 'While changing DNS: URLError: {} ==> Is the Internet down?'.format(e.reason)
-    except Exception as e:
-        result = 'While changing DNS: Error: {}'.format(e)
-    return(code, result)
-    
+            result = 'Unknow error: {}'.format(result)
+    result = '[FreeDNS] {}'.format(result)
+    return(success, result)
+
+ipFile = sys.path[0]+sep+'ip.txt'
+logFile = sys.path[0]+sep+'freednsip.log'
+
+# Reading from setting.cfg file
+config = ConfigParser.RawConfigParser()
+config.read(sys.path[0]+sep+'settings.cfg')
+
+# Set up logging
+logLevel = config.get('logging', 'logLevel')
+consoleLogLevel = config.get('logging', 'consoleLogLevel')
+FORMAT = '%(asctime)s | %(levelname)-7s | %(message)s'
+logging.basicConfig(filename = logFile, level = logLevel, format = FORMAT)
+console = logging.StreamHandler(sys.stdout)
+console.setLevel(consoleLogLevel)
+console.setFormatter(logging.Formatter('%(message)s'))
+logging.getLogger('').addHandler(console)
+
+# Get IP Address
 try:
-    # Get IP Address
     currentIP = urllib2.urlopen(config.get('publicIP','url')).read().strip()
-    logging.debug('%-22s\t%s', 'Current IP address is:', currentIP)
+except urllib2.HTTPError as e:
+    logging.error('[Public IP] HTTP {} {}'.format(e.code, e.reason))
+except urllib2.URLError as e:
+    logging.error('[Public IP] URLError: {} ==> Is the Internet down?'.format(e.reason,))
+else:
+    logging.debug('{0:<22s}\t{1:>15s}'.format('Current IP address is:', currentIP))
     # Read previously recorded IP from ipFile
     if os.path.exists(ipFile):
         f = open(ipFile,'r')    
@@ -80,23 +87,16 @@ try:
         f.close()
     else:
         previousIP = 'IP file not found'
-        
-    logging.debug('%-22s\t%s','Previous IP as recorded:', previousIP)
+    logging.debug('{0:<22s}\t{1:>15s}'.format('Previous IP as recorded:', previousIP))
 
     if previousIP == currentIP:
-        logging.info('IP address %s not changed.', currentIP)
+        logging.info('{0:<22s}\t{1:>15s}'.format('IP address not changed:', currentIP))
     else:
-        logging.info('%-22s ==>\t%s', 'IP changed: ' +  previousIP, currentIP)
-        (code, result) = updatedns(currentIP)
-        if code:
+        logging.info('{0:<22s}\t{1:>15s}  ==>  {2}'.format('IP changed:',previousIP, currentIP))
+        (success, result) = updatedns(currentIP)
+        if success:
             logging.info(result)
-            emailadmin(result)
+            #emailadmin(result)
             logging.debug('Notification email sent out to admins.')
         else:
             logging.error(result)
-except urllib2.HTTPError as e:
-    logging.error('While checking IP: HTTP {}: {}'.format(e.code, e.reason))
-except urllib2.URLError as e:
-    logging.error('While checking IP: URLError: {} ==> Is the Internet down?'.format(e.reason))
-except Exception as e:
-    logging.error('While checking IP: Error: {}'.format(e))
