@@ -96,7 +96,7 @@ else:
         (success, result) = updatedns(currentIP)
         if success:
             logging.info(result)
-            #emailadmin(result)
+            emailadmin(result)
             logging.debug('Notification email sent out to admins.')
         else:
             logging.error(result)
