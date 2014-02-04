@@ -35,15 +35,14 @@ def emailadmin(mesg):
 def updatedns(ip):
   success = False
   try:
-    conn = urllib2.urlopen(config.get('freeDNS','url'))
+    result = urllib2.urlopen(config.get('freeDNS','url')).read().strip()
   except urllib2.HTTPError as e:
     result = 'HTTP {} {}'.format(e.code, e.reason)
   except urllib2.URLError as e:
-    result = 'URLError: {} ==> Is the Internet down?'.format(e.reason,)
+    result = 'URLError: {}'.format(e.reason,)
   except Exception as e:
     result = 'Error: {}'.format(str(e))
   else:
-    result = conn.read().strip()
     if 'Updated' in result or 'has not changed' in result:
       f = open(ipFile,'w')
       f.write(ip)
@@ -53,6 +52,18 @@ def updatedns(ip):
       result = 'Unknow error: {}'.format(result)
   result = '[FreeDNS] {}'.format(result)
   return(success, result)
+  
+def getIP():
+  success = False
+  try:
+    result = urllib2.urlopen(config.get('publicIP','url')).read().strip()
+  except urllib2.HTTPError as e:
+    result = '[Public IP] HTTP {} {}'.format(e.code, e.reason)
+  except urllib2.URLError as e:
+    result = '[Public IP] URLError: {}'.format(e.reason,)
+  else:
+    success = True
+  return (success, result)
 
 ipFile = sys.path[0]+sep+'ip.txt'
 logFile = sys.path[0]+sep+'freednsip.log'
@@ -66,6 +77,7 @@ logLevel = config.get('logging', 'logLevel')
 consoleLogLevel = config.get('logging', 'consoleLogLevel')
 FORMAT = '%(asctime)s | %(levelname)-7s | %(message)s'
 logtemplate = '''{0:<22s}\t{1:>15s}'''
+logtemplatelong = logtemplate + '''  ==>  {2}'''
 logging.basicConfig(filename = logFile, level = logLevel, format = FORMAT)
 # display logging information in console.
 console = logging.StreamHandler(sys.stdout)
@@ -74,39 +86,38 @@ console.setFormatter(logging.Formatter(FORMAT))
 logging.getLogger('').addHandler(console)
 
 # Get IP Address
-try:
-  currentIP = urllib2.urlopen(config.get('publicIP','url')).read().strip()
-except urllib2.HTTPError as e:
-  logging.error('[Public IP] HTTP {} {}'.format(e.code, e.reason))
-except urllib2.URLError as e:
-  logging.error('[Public IP] URLError: {}'.format(e.reason,))
-else:
+(s, currentIP) = getIP()
+if 'Errno 8' in currentIP:  # If strange 'error 8', then retry it once.
+  logging.error(currentIP)
+  (s, currentIP) = getIP()
+if s == False:
+  logging.error(currentIP)
+elif currentIP == '209.114.127.125':
   # If using VPN, Do not update anything...
-  if currentIP == '209.114.127.125':
-    logging.debug(logtemplate.format('Using VPN, skipping:', currentIP))
-    print logtemplate.format('Using VPN, skipping:', currentIP)
+  logging.debug(logtemplate.format('Using VPN, skipping:', currentIP))
+  print logtemplate.format('Using VPN, skipping:', currentIP)
+else:
+  logging.debug(logtemplate.format('Current IP address is:', currentIP))
+  # Read previously recorded IP from ipFile
+  if os.path.exists(ipFile):
+    f = open(ipFile,'r')
+    previousIP = f.read().strip()
+    f.close()
   else:
-    logging.debug(logtemplate.format('Current IP address is:', currentIP))
-    # Read previously recorded IP from ipFile
-    if os.path.exists(ipFile):
-      f = open(ipFile,'r')
-      previousIP = f.read().strip()
-      f.close()
-    else:
-      previousIP = 'IP file not found'
-    logging.debug(logtemplate.format('Previous IP as recorded:', previousIP))
+    previousIP = 'IP file not found'
+  logging.debug(logtemplate.format('Previous IP as recorded:', previousIP))
 
-    if previousIP == currentIP:
-      logging.debug(logtemplate.format('IP address not changed:', currentIP))
-      print logtemplate.format('IP address not changed:', currentIP)
+  if previousIP == currentIP:
+    logging.debug(logtemplate.format('IP address not changed:', currentIP))
+    print logtemplate.format('IP address not changed:', currentIP)
+  else:
+    logging.debug(logtemplatelong.format('IP changed:',previousIP, currentIP))
+    print logtemplatelong.format('IP changed:',previousIP, currentIP)
+    (success, result) = updatedns(currentIP)
+    if success:
+      logging.info(result)
+      print result
+      emailadmin(result)
+      logging.debug('Notification email sent out to admins.')
     else:
-      logging.debug('{0:<22s}\t{1:>15s}  ==>  {2}'.format('IP changed:',previousIP, currentIP))
-      print '{0:<22s}\t{1:>15s}  ==>  {2}'.format('IP changed:',previousIP, currentIP)
-      (success, result) = updatedns(currentIP)
-      if success:
-        logging.info(result)
-        print result
-        emailadmin(result)
-        logging.debug('Notification email sent out to admins.')
-      else:
-        logging.error(result)
+      logging.error(result)
