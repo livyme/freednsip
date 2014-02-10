@@ -25,7 +25,7 @@ def emailadmin(mesg):
   # Get gmail account info.
   username = config.get('gmail','username')
   password = config.get('gmail','password')
-  # Mail send using alert
+  # Send
   server = smtplib.SMTP('smtp.gmail.com:587')
   server.starttls()
   server.login(username,password)
@@ -40,6 +40,8 @@ def queryOnline(url):
     result = 'HTTP {} {}'.format(e.code, e.reason)
   except urllib2.URLError as e:
     result = 'URLError: {}'.format(e.reason,)
+  except Exception as e:
+    result = str(e)
   else:
     success = True
   return (success, result)
@@ -75,9 +77,11 @@ elif IPresult == '209.114.127.125':  # If using VPN, Do not update anything...
   logging.debug(logtemplate.format('Using VPN, skipping:', IPresult))
   print logtemplate.format('Using VPN, skipping:', IPresult)
 else:   
+  # We got the current IP!
   currentIP = IPresult;
   logging.debug(logtemplate.format('Current IP address is:', currentIP))
-  # Read previously recorded IP from ipFile
+  
+  # Read Previous IP from ipFile
   if os.path.exists(ipFile):
     f = open(ipFile,'r')
     previousIP = f.read().strip()
@@ -86,19 +90,24 @@ else:
     previousIP = 'IP file not found'
   logging.debug(logtemplate.format('Previous IP as recorded:', previousIP))
 
+  # See if IP changed...
   if previousIP == currentIP:
     logging.debug(logtemplate.format('IP address not changed:', currentIP))
     print logtemplate.format('IP address not changed:', currentIP)
   else:
     logging.debug(logtemplatelong.format('IP changed:',previousIP, currentIP))
     print logtemplatelong.format('IP changed:',previousIP, currentIP)
+    
+    # Update FreeDNS with current IP...
     (success, freeDNSresult) = queryOnline(config.get('freeDNS','url'))
     if 'Updated' in freeDNSresult or 'has not changed' in freeDNSresult:
       logging.info('[FreeDNS] {}'.format(freeDNSresult))
       print '[FreeDNS] {}'.format(freeDNSresult)
+      # Update IP file:
       f = open(ipFile,'w')
       f.write(currentIP)
       f.close()
+      # Let the admins know by email
       emailadmin('[FreeDNS] {}'.format(freeDNSresult))
       logging.debug('Notification email sent out to admins.')
     else:
