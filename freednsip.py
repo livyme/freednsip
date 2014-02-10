@@ -32,35 +32,14 @@ def emailadmin(mesg):
   server.sendmail(username, recipients, msg.as_string())
   server.quit()
 
-def updatedns(ip):
+def queryOnline(url):
   success = False
   try:
-    result = urllib2.urlopen(config.get('freeDNS','url')).read().strip()
+    result = urllib2.urlopen(url).read().strip()
   except urllib2.HTTPError as e:
     result = 'HTTP {} {}'.format(e.code, e.reason)
   except urllib2.URLError as e:
     result = 'URLError: {}'.format(e.reason,)
-  except Exception as e:
-    result = 'Error: {}'.format(str(e))
-  else:
-    if 'Updated' in result or 'has not changed' in result:
-      f = open(ipFile,'w')
-      f.write(ip)
-      f.close()
-      success = True
-    else:
-      result = 'Unknow error: {}'.format(result)
-  result = '[FreeDNS] {}'.format(result)
-  return(success, result)
-  
-def getIP():
-  success = False
-  try:
-    result = urllib2.urlopen(config.get('publicIP','url')).read().strip()
-  except urllib2.HTTPError as e:
-    result = '[Public IP] HTTP {} {}'.format(e.code, e.reason)
-  except urllib2.URLError as e:
-    result = '[Public IP] URLError: {}'.format(e.reason,)
   else:
     success = True
   return (success, result)
@@ -86,17 +65,17 @@ console.setFormatter(logging.Formatter(FORMAT))
 logging.getLogger('').addHandler(console)
 
 # Get IP Address
-(s, currentIP) = getIP()
-if 'Errno 8' in currentIP:  # If strange 'error 8', then retry it once.
-  logging.error(currentIP)
-  (s, currentIP) = getIP()
-if s == False:
-  logging.error(currentIP)
-elif currentIP == '209.114.127.125':
-  # If using VPN, Do not update anything...
-  logging.debug(logtemplate.format('Using VPN, skipping:', currentIP))
-  print logtemplate.format('Using VPN, skipping:', currentIP)
-else:
+(success, IPresult) = queryOnline(config.get('publicIP','url'))
+if 'Errno 8' in IPresult:  # If strange 'error 8', then retry it once more.
+  logging.error('[Public IP] {}'.format(IPresult))
+  (success, IPresult) = queryOnline(config.get('publicIP','url'))
+if success == False:     # If not success, log error...
+  logging.error('[Public IP] {}'.format(IPresult))
+elif IPresult == '209.114.127.125':  # If using VPN, Do not update anything...
+  logging.debug(logtemplate.format('Using VPN, skipping:', IPresult))
+  print logtemplate.format('Using VPN, skipping:', IPresult)
+else:   
+  currentIP = IPresult;
   logging.debug(logtemplate.format('Current IP address is:', currentIP))
   # Read previously recorded IP from ipFile
   if os.path.exists(ipFile):
@@ -113,11 +92,14 @@ else:
   else:
     logging.debug(logtemplatelong.format('IP changed:',previousIP, currentIP))
     print logtemplatelong.format('IP changed:',previousIP, currentIP)
-    (success, result) = updatedns(currentIP)
-    if success:
-      logging.info(result)
-      print result
-      emailadmin(result)
+    (success, freeDNSresult) = queryOnline(config.get('freeDNS','url'))
+    if 'Updated' in freeDNSresult or 'has not changed' in freeDNSresult:
+      logging.info('[FreeDNS] {}'.format(freeDNSresult))
+      print '[FreeDNS] {}'.format(freeDNSresult)
+      f = open(ipFile,'w')
+      f.write(currentIP)
+      f.close()
+      emailadmin('[FreeDNS] {}'.format(freeDNSresult))
       logging.debug('Notification email sent out to admins.')
     else:
-      logging.error(result)
+      logging.error('[FreeDNS] {}'.format(freeDNSresult))
