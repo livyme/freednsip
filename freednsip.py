@@ -15,16 +15,16 @@ from os import sep
 import logging
 import ConfigParser
 
-def emailadmin(mesg):
+def email_admin(mesg):
   # Prepare message
   recipients = ['i@livyme.com',]
   msg = MIMEText(mesg)
   msg['From'] = 'root'
   msg['To'] = ', '.join(recipients)
-  msg['Subject'] = config.get('me','name') + ' IP Change'
+  msg['Subject'] = config.get('me', 'name') + ' IP Change'
   # Get gmail account info.
-  username = config.get('gmail','username')
-  password = config.get('gmail','password')
+  username = config.get('gmail', 'username')
+  password = config.get('gmail', 'password')
   # Send
   server = smtplib.SMTP('smtp.gmail.com:587')
   server.starttls()
@@ -32,7 +32,7 @@ def emailadmin(mesg):
   server.sendmail(username, recipients, msg.as_string())
   server.quit()
 
-def queryOnline(url):
+def query_online(url):
   success = False
   try:
     result = urllib2.urlopen(url).read().strip()
@@ -57,9 +57,9 @@ config.read(sys.path[0]+sep+'settings.cfg')
 logLevel = config.get('logging', 'logLevel')
 consoleLogLevel = config.get('logging', 'consoleLogLevel')
 FORMAT = '%(asctime)s | %(levelname)-7s | %(message)s'
-logtemplate = '''{0:<22s}\t{1:>15s}'''
-logtemplatelong = logtemplate + '''  ==>  {2}'''
-logging.basicConfig(filename = logFile, level = logLevel, format = FORMAT)
+logtemplate = '{0:<22s}\t{1:>15s}'
+logtemplatelong = logtemplate + '  ==>  {2}'
+logging.basicConfig(filename=logFile, level=logLevel, format=FORMAT)
 # display logging information in console.
 console = logging.StreamHandler(sys.stdout)
 console.setLevel(consoleLogLevel)
@@ -67,17 +67,13 @@ console.setFormatter(logging.Formatter(FORMAT))
 logging.getLogger('').addHandler(console)
 
 # Get IP Address
-(success, IPresult) = queryOnline(config.get('publicIP','url'))
-if 'Errno 8' in IPresult:  # If strange 'error 8', then retry it once more.
+(success, IPresult) = query_online(config.get('publicIP','url'))
+if not success:     
   logging.error('[Public IP] {}'.format(IPresult))
-  (success, IPresult) = queryOnline(config.get('publicIP','url'))
-if success == False:     # If not success, log error...
-  logging.error('[Public IP] {}'.format(IPresult))
-elif IPresult == '209.114.127.125':  # If using VPN, Do not update anything...
+elif IPresult == '209.114.127.125':  # Do not update when using VPN
   logging.debug(logtemplate.format('Using VPN, skipping:', IPresult))
   print logtemplate.format('Using VPN, skipping:', IPresult)
 else:   
-  # We got the current IP!
   currentIP = IPresult;
   logging.debug(logtemplate.format('Current IP address is:', currentIP))
   
@@ -99,7 +95,7 @@ else:
     print logtemplatelong.format('IP changed:',previousIP, currentIP)
     
     # Update FreeDNS with current IP...
-    (success, freeDNSresult) = queryOnline(config.get('freeDNS','url'))
+    (success, freeDNSresult) = query_online(config.get('freeDNS','url'))
     if 'Updated' in freeDNSresult or 'has not changed' in freeDNSresult:
       logging.info('[FreeDNS] {}'.format(freeDNSresult))
       print '[FreeDNS] {}'.format(freeDNSresult)
@@ -108,7 +104,7 @@ else:
       f.write(currentIP)
       f.close()
       # Let the admins know by email
-      emailadmin('[FreeDNS] {}'.format(freeDNSresult))
+      email_admin('[FreeDNS] {}'.format(freeDNSresult))
       logging.debug('Notification email sent out to admins.')
     else:
       logging.error('[FreeDNS] {}'.format(freeDNSresult))
