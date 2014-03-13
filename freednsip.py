@@ -37,9 +37,9 @@ def query_online(url):
   try:
     result = urllib2.urlopen(url).read().strip()
   except urllib2.HTTPError as e:
-    result = 'HTTP {} {}'.format(e.code, e.reason)
+    result = 'HTTP {0} {1}'.format(e.code, e.reason)
   except urllib2.URLError as e:
-    result = 'URLError: {}'.format(e.reason,)
+    result = 'URLError: {0}'.format(e.reason,)
   except Exception as e:
     result = str(e)
   else:
@@ -69,7 +69,7 @@ logging.getLogger('').addHandler(console)
 # Get IP Address
 (success, IPresult) = query_online(config.get('publicIP','url'))
 if not success:     
-  logging.error('[Public IP] {}'.format(IPresult))
+  logging.error('[Public IP] {0}'.format(IPresult))
 elif IPresult == '209.114.127.125':  # Do not update when using VPN
   logging.debug(logtemplate.format('Using VPN, skipping:', IPresult))
   print logtemplate.format('Using VPN, skipping:', IPresult)
@@ -97,14 +97,14 @@ else:
     # Update FreeDNS with current IP...
     (success, freeDNSresult) = query_online(config.get('freeDNS','url'))
     if 'Updated' in freeDNSresult or 'has not changed' in freeDNSresult:
-      logging.info('[FreeDNS] {}'.format(freeDNSresult))
-      print '[FreeDNS] {}'.format(freeDNSresult)
+      logging.info('[FreeDNS] {0}'.format(freeDNSresult))
+      print '[FreeDNS] {0}'.format(freeDNSresult)
       # Update IP file:
       f = open(ipFile,'w')
       f.write(currentIP)
       f.close()
       # Let the admins know by email
-      email_admin('[FreeDNS] {}'.format(freeDNSresult))
+      emailadmin('[FreeDNS] {0}'.format(freeDNSresult))
       logging.debug('Notification email sent out to admins.')
     else:
-      logging.error('[FreeDNS] {}'.format(freeDNSresult))
+      logging.error('[FreeDNS] {0}'.format(freeDNSresult))
