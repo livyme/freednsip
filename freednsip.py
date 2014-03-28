@@ -9,10 +9,13 @@
 import smtplib
 from email.mime.text import MIMEText
 import urllib2
-import os.path
 import sys
 from os import sep
 import ConfigParser
+
+ipFile = sys.path[0]+sep+'ip.txt'
+config = ConfigParser.RawConfigParser()
+config.read(sys.path[0]+sep+'settings.cfg')
 
 def email_admin(mesg):
   recipients = ['i@livyme.com',]
@@ -42,30 +45,22 @@ def query_online(url):
     success = True
   return (success, result)
 
-ipFile = sys.path[0]+sep+'ip.txt'
-
-# Reading from setting.cfg file
-config = ConfigParser.RawConfigParser()
-config.read(sys.path[0]+sep+'settings.cfg')
-
 # Get IP Address
 (success, current_ip) = query_online(config.get('publicIP','url'))
 if not success:     
-  sys.stderr.write('[Public IP] {0}'.format(IPresult))
+  sys.stderr.write('[Public IP] {0}'.format(current_ip))
 elif current_ip != '209.114.127.125':  # Do not update when using FHSU VPN
-  if os.path.exists(ipFile):
-    f = open(ipFile,'r')
-    previous_ip = f.read().strip()
-    f.close()
-  else:
-    previous_ip = 'IP file not found'
+  try:
+    with open(ipFile,'r') as f:
+      previous_ip = f.read().strip()
+  except:
+    previous_ip = 'Cannot get previous IP.'
 
   if previous_ip != current_ip:
     (success, free_dns_result) = query_online(config.get('freeDNS','url'))
     if 'Updated' in free_dns_result or 'has not changed' in free_dns_result:
-      f = open(ipFile,'w')
-      f.write(current_ip)
-      f.close()
+      with open(ipFile,'w') as f:
+        f.write(current_ip)
       # Let the admins know by email
       email_admin('[FreeDNS] {0}'.format(free_dns_result))
     else:
